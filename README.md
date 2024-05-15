@@ -1,12 +1,13 @@
-# Initialization
+## Initialization
 
 ---
 
-```bash
+```commandline
 docker-compose build
 
 docker compose up aiflow-init
 
+# start services
 docker compose up -d
 ```
 
@@ -16,3 +17,10 @@ docker compose up -d
 
 ---
 To include dependancies, update `requiremnets.txt` file and run `docker-compose build` again.
+
+## Cleaning-up environment
+
+---
+```commandline
+docker compose down -v
+```
