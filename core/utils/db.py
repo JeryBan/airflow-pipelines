@@ -4,16 +4,10 @@ to databases.
 """
 from pathlib import Path
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from airflow.models.connection import Connection
+from datetime import datetime
 from core.utils.data import query_to_csv
-
-
-def connect_to_testdb() -> Connection:
-    """Returns a connection with a test db."""
-    hook = PostgresHook(postgres_conn_id="test_localhost")
-    conn = hook.get_conn()
-    print(conn)
-    return conn
 
 
 def perform_query(conn: Connection,
@@ -30,6 +24,14 @@ def perform_query(conn: Connection,
 
     cursor.close()
     return queryresult
+
+
+def connect_to_testdb() -> Connection:
+    """Returns a connection with a test db."""
+    hook = PostgresHook(postgres_conn_id="test_localhost")
+    conn = hook.get_conn()
+    print(conn)
+    return conn
 
 
 def close_connection(conn: Connection) -> None:

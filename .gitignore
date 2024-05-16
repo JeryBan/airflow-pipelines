@@ -80,3 +80,7 @@ ipython_config.py
 
 # Idea
 .idea/
+
+# airflow
+secrets.py
+logs/*
