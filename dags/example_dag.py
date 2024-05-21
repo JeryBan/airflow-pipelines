@@ -6,6 +6,7 @@ from airflow.decorators import dag, task
 from datetime import datetime, timedelta
 from pathlib import Path
 from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+from core.utils.db import connect_to_testdb, perform_query, close_connection
 
 DATA_DIR = Path('./data')
 
@@ -24,14 +25,22 @@ default_args = {
 def etl():
     @task(retries=2)
     def extract():
-        SQLExecuteQueryOperator(
-            task_id='fetch_query',
-            conn_id='test_localhost',
-            sql="INSERT INTO users (name) VALUES ('airflow_dag')",
-            autocommit=True
-        )
+        conn = connect_to_testdb()
 
-        return 'user created'
+        query = '''
+        CREATE TABLE IF NOT EXISTS devs (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(50)
+        );
+        '''
+
+        queryresult = perform_query(conn=conn,
+                                     query=query,
+                                     save_path=DATA_DIR,
+                                     output_type='csv')
+
+        close_connection(conn)
+        return queryresult
 
     @task(multiple_outputs=True)
     def transform(extracted_data):
@@ -49,8 +58,8 @@ def etl():
 
     # schema
     ext = extract()
-    transform = transform(ext)
-    load = load(transform)
+    transform_task = transform(ext)
+    load_task = load(transform_task)
 
 
 example_etl_dag = etl()

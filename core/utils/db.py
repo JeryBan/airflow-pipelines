@@ -17,7 +17,9 @@ def perform_query(conn: Connection,
     """Runs a query to a specific db connected
     and saves it to the desired path and type."""
     cursor = conn.cursor()
-    queryresult = cursor.execute(query)
+    cursor.execute(query)
+
+    queryresult = cursor.fetchone()
 
     if output_type == 'csv':
         query_to_csv(cursor=cursor, save_path=save_path)
@@ -28,7 +30,7 @@ def perform_query(conn: Connection,
 
 def connect_to_testdb() -> Connection:
     """Returns a connection with a test db."""
-    hook = PostgresHook(postgres_conn_id="test_localhost")
+    hook = PostgresHook(postgres_conn_id="test_localhost", schema='public')
     conn = hook.get_conn()
     print(conn)
     return conn

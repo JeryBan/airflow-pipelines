@@ -93,8 +93,6 @@ services:
       POSTGRES_DB: airflow
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
-    ports:
-      - 5432:5432
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 10s
@@ -133,6 +131,7 @@ services:
       <<: *airflow-common-depends-on
       airflow-init:
         condition: service_completed_successfully
+
 
   airflow-triggerer:
     <<: *airflow-common
@@ -232,3 +231,4 @@ services:
 
 volumes:
   postgres-db-volume:
+
