@@ -5,7 +5,6 @@ a basic etl pipeline.
 from airflow.decorators import dag, task
 from datetime import datetime, timedelta
 from pathlib import Path
-from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from core.utils.db import connect_to_testdb, perform_query, close_connection
 
 DATA_DIR = Path('./data')
@@ -28,16 +27,14 @@ def etl():
         conn = connect_to_testdb()
 
         query = '''
-        CREATE TABLE IF NOT EXISTS devs (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(50)
-        );
+        SELECT * FROM users
+        WHERE user.id = %s;
         '''
 
-        queryresult = perform_query(conn=conn,
-                                     query=query,
-                                     save_path=DATA_DIR,
-                                     output_type='csv')
+        user_id = 1
+        queryresult = perform_query(user_id,
+                                    conn=conn,
+                                    query=query)
 
         close_connection(conn)
         return queryresult

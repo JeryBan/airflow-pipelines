@@ -7,6 +7,8 @@ name = "pypi"
 python-dotenv = "*"
 
 [dev-packages]
+apache-airflow = "*"
+apache-airflow-providers-postgres = "*"
 
 [requires]
 python_version = "3.12"

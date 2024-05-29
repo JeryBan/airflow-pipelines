@@ -2,42 +2,73 @@
 Utility functions to manipulate connections
 to databases.
 """
-from pathlib import Path
+import logging
+
+from airflow.models import connection
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
-from airflow.models.connection import Connection
-from datetime import datetime
-from core.utils.data import query_to_csv
 
 
-def perform_query(conn: Connection,
+def perform_query(*args,
+                  conn: connection,
                   query: str,
-                  output_type: str,
-                  save_path: Path):
-    """Runs a query to a specific db connected
-    and saves it to the desired path and type."""
-    cursor = conn.cursor()
-    cursor.execute(query)
+                  many=True):
+    """Performs a query to a specific db.
 
-    queryresult = cursor.fetchone()
+    :param conn: The connection to a db.
+    :param query: The SQL query to execute.
+    :param args: Values to replace placeholders for the query.
+    :param many: Set to false if you expect one entry returned from the query.
 
-    if output_type == 'csv':
-        query_to_csv(cursor=cursor, save_path=save_path)
+    :returns: The result of the query."""
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(query, args)
 
-    cursor.close()
-    return queryresult
+            if many:
+                queryresult = cursor.fetchall()
+            else:
+                queryresult = cursor.fetchone()
+            return queryresult
+    except Exception as e:
+        logging.error(f"Error executing query: {e}")
+        raise
+    finally:
+        cursor.close()
 
 
-def connect_to_testdb() -> Connection:
-    """Returns a connection with a test db."""
-    hook = PostgresHook(postgres_conn_id="test_localhost", schema='public')
-    conn = hook.get_conn()
-    print(conn)
-    return conn
+def connect_to_eae() -> connection:
+    """Returns a connection with eae database."""
+    hook = PostgresHook(postgres_conn_id="eae_vpn")
+    try:
+        conn = hook.get_conn()
+        return conn
+    except ConnectionRefusedError as e:
+        logging.error(f'Connection Refused: {e}')
+        raise
+    except ConnectionError as e:
+        print(e)
 
 
-def close_connection(conn: Connection) -> None:
+def connect_to_testdb() -> connection:
+    """Returns a connection with a test db.
+    Edit connection credentials from the airflow connection tab in the UI."""
+    hook = PostgresHook(postgres_conn_id="test_localhost")
+    try:
+        conn = hook.get_conn()
+        return conn
+    except ConnectionRefusedError as e:
+        logging.error(f'Connection Refused: {e}')
+        raise
+    except ConnectionError as e:
+        print(e)
+
+
+def close_connection(conn: connection) -> None:
+    """Close a connection.
+    :param conn: The connection you want to close.
+    """
     try:
         conn.close()
-    except Exception as e:
-        print(f'Error closing a connection: {e}')
+    except ConnectionError as e:
+        logging.error(f'Error closing a connection: {e}')
+        raise
