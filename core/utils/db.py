@@ -6,7 +6,6 @@ import logging
 
 from airflow.models import connection
 from airflow.providers.postgres.hooks.postgres import PostgresHook
-<<<<<<< HEAD
 
 
 def perform_query(*args,
@@ -46,7 +45,7 @@ def connect_to_eae() -> connection:
     except ConnectionRefusedError as e:
         logging.error(f'Connection Refused: {e}')
         raise
-=======
+
 from airflow.models.connection import Connection
 from datetime import datetime
 
@@ -104,12 +103,10 @@ def connect_to_testdb() -> Connection:
 
     except ConnectionRefusedError as e:
         print(e)
->>>>>>> 33da5cb (wip)
     except ConnectionError as e:
         print(e)
 
 
-<<<<<<< HEAD
 def connect_to_testdb() -> connection:
     """Returns a connection with a test db.
     Edit connection credentials from the airflow connection tab in the UI."""
@@ -128,10 +125,9 @@ def close_connection(conn: connection) -> None:
     """Close a connection.
     :param conn: The connection you want to close.
     """
-=======
+
 def close_connection(conn: Connection) -> None:
     """Close a connection"""
->>>>>>> 33da5cb (wip)
     try:
         conn.close()
     except ConnectionError as e:
