@@ -6,6 +6,7 @@ import logging
 
 from airflow.models import connection
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+<<<<<<< HEAD
 
 
 def perform_query(*args,
@@ -45,10 +46,70 @@ def connect_to_eae() -> connection:
     except ConnectionRefusedError as e:
         logging.error(f'Connection Refused: {e}')
         raise
+=======
+from airflow.models.connection import Connection
+from datetime import datetime
+
+
+def perform_query(*args,
+                  conn: Connection,
+                  query: str) -> list:
+    """Runs a query to a specific db.
+
+    :argument args: additional parameters for the query
+    :argument conn: the connection object to the specific db
+    :argument query: query to execute
+
+    :returns: the result of the query executed
+    """
+    cursor = conn.cursor()
+
+    try:
+
+        cursor.execute(query, args)
+
+        queryresult = cursor.fetchall()
+
+        return queryresult
+
+    except Exception as e:
+        print(e)
+    finally:
+        cursor.close()
+
+
+def connect_to_postgres(database: str) -> Connection:
+    """Establish a connection with a postgres database.
+    :returns: A connection object.
+    """
+    hook = PostgresHook(postgres_conn_id=database)
+    try:
+        conn = hook.get_conn()
+        return conn
+
+    except ConnectionRefusedError as e:
+        print(e)
     except ConnectionError as e:
         print(e)
 
 
+def connect_to_testdb() -> Connection:
+    """Establish a connection with a test db.
+    :returns: A connection object.
+    """
+    hook = PostgresHook(postgres_conn_id="test_localhost")
+    try:
+        conn = hook.get_conn()
+        return conn
+
+    except ConnectionRefusedError as e:
+        print(e)
+>>>>>>> 33da5cb (wip)
+    except ConnectionError as e:
+        print(e)
+
+
+<<<<<<< HEAD
 def connect_to_testdb() -> connection:
     """Returns a connection with a test db.
     Edit connection credentials from the airflow connection tab in the UI."""
@@ -67,6 +128,10 @@ def close_connection(conn: connection) -> None:
     """Close a connection.
     :param conn: The connection you want to close.
     """
+=======
+def close_connection(conn: Connection) -> None:
+    """Close a connection"""
+>>>>>>> 33da5cb (wip)
     try:
         conn.close()
     except ConnectionError as e:

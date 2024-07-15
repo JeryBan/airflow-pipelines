@@ -5,6 +5,10 @@ name = "pypi"
 
 [packages]
 python-dotenv = "*"
+apache-airflow = "*"
+apache-airflow-providers-postgres = "*"
+torch = "*"
+torchvision = "*"
 
 [dev-packages]
 apache-airflow = "*"

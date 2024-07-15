@@ -5,7 +5,11 @@ a basic etl pipeline.
 from airflow.decorators import dag, task
 from datetime import datetime, timedelta
 from pathlib import Path
+<<<<<<< HEAD
 from core.utils.db import connect_to_testdb, perform_query, close_connection
+=======
+from core.utils.db import connect_to_testdb, perform_query, close_connection, connect_to_eae
+>>>>>>> 33da5cb (wip)
 
 DATA_DIR = Path('./data')
 
@@ -27,6 +31,7 @@ def etl():
         conn = connect_to_testdb()
 
         query = '''
+<<<<<<< HEAD
         SELECT * FROM users
         WHERE user.id = %s;
         '''
@@ -34,6 +39,12 @@ def etl():
         user_id = 1
         queryresult = perform_query(user_id,
                                     conn=conn,
+=======
+        select * from users       
+        '''
+
+        queryresult = perform_query(conn=conn,
+>>>>>>> 33da5cb (wip)
                                     query=query)
 
         close_connection(conn)
