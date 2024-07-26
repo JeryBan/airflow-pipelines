@@ -10,7 +10,6 @@
     "airflow-triggerer",
     "postgres"
   ],
-  "workspaceFolder": "/workspace",
   "forwardPorts": [8085, 5432],
   "settings": {
     "terminal.integrated.shell.linux": "/bin/bash"
@@ -20,5 +19,5 @@
   ],
   "postStartCommand": "docker-compose up -d",
   "shutdownAction": "stopCompose",
-  "overrideCommand": false
+  "overrideCommand": false,
 }
