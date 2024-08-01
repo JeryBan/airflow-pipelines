@@ -1,26 +1,30 @@
+
+# Project Title
+
 ## Initialization
+----------------------
+command line
 
----
+```docker-compose build```
 
-```commandline
-docker-compose build
-
-docker compose up airflow-init
+```docker compose up airflow-init```
 
 # start services
-docker compose up -d
-```
 
-* server runs at http://localhost:8080
+```docker compose up -d```
+
+Server runs at http://localhost:8080
 
 ## Dependancies
 
----
-To include dependancies, update `requiremnets.txt` file and run `docker-compose build` again.
+To include dependancies:
+
+    1. update `requiremnets.txt` file  
+    2. run `docker-compose build` again.
 
 ## Cleaning-up environment
 
 ---
-```commandline
+```commandlin
 docker compose down -v
-```
+
