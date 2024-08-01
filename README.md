@@ -8,7 +8,7 @@
 
 ```docker compose up airflow-init```
 
-# start services
+## Start services
 
 ```docker compose up -d```
 
