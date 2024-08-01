@@ -23,6 +23,7 @@ default_args = {
      schedule_interval='@daily',  # crontab syntax
      catchup=False)
 def etl():
+    
     @task(retries=2)
     def extract():
         conn = connect_to_testdb()

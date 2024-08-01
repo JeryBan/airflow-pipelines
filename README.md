@@ -5,7 +5,7 @@
 ```commandline
 docker-compose build
 
-docker compose up aiflow-init
+docker compose up airflow-init
 
 # start services
 docker compose up -d
