@@ -3,7 +3,6 @@
 
 ## Initialization
 ----------------------
-command line
 
 ```docker-compose build```
 
