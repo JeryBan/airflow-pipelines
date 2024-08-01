@@ -1,0 +1,4 @@
+WEB_IP=
+APP_IP=
+WEB_KEY=/path/to/web/key
+APP_KEY=/path/to/app/key
