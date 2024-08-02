@@ -1,0 +1,127 @@
+image: python:3.9
+
+services:
+- docker:dind
+
+variables:
+  AIRFLOW_CONTAINER: "extended_airflow:latest"
+  WEB_IP: $WEB_IP
+  APP_IP: $APP_IP
+  WEB_KEY: $WEB_KEY
+  APP_KEY: $APP_KEY
+  FILE_SERVER_HOST: $FILE_SERVER_HOST
+  FILE_SERVER_PORT: $FILE_SERVER_PORT
+  FILE_SERVER_USER: $FILE_SERVER_USER
+  FILE_SERVER_PASSWORD: $FILE_SERVER_PASSWORD
+  FILE_SERVER_DIR: $FILE_SERVER_DIR
+  NAS_HOST: $NAS_HOST
+  NAS_USER: $NAS_USER
+  NAS_PASSWORD: $NAS_PASSWORD
+  NAS_DIR: $NAS_DIR
+
+stages:
+- prepare
+- build
+- test
+- deploy
+- post-deploy
+
+# Pause of all the DAGs running active to ensure stability 
+pause_airflow_dags:
+  stage: prepare
+  script:
+  - echo "Pausing all Airflow DAGs..."
+  - docker-compose exec ${AIRFLOW_CONTAINER} airflow dags pause --all
+  rules:
+  - if: '$CI_COMMIT_BRANCH == "staging"'
+  tags:
+  - docker
+
+# Build the application
+build:
+  stage: build
+  script:
+  - echo "Building application..."
+  - docker-compose build
+  - pip install -r requirements.txt
+  rules:
+  - if: '$CI_COMMIT_BRANCH == "staging"'
+  tags:
+  - docker
+  needs:
+  - pause_airflow_dags
+
+# Run tests
+test:
+  stage: test
+  script:
+  - echo "Starting Docker services..."
+  - docker-compose up -d
+  - sleep 30
+  - echo "Running tests..."
+  - pytest --junitxml=path/to/report.xml
+  after_script:
+  - echo "Stopping Docker services..."
+  - docker-compose down -v
+  rules:
+  - if: '$CI_COMMIT_BRANCH == "staging"'
+  tags:
+  - docker
+  needs:
+  - build
+
+# Deploy to staging environment
+deploy_to_staging:
+  stage: deploy
+  script:
+  - echo "Deploying to staging..."
+  # Add your staging deployment commands here
+  rules:
+  - if: '$CI_COMMIT_BRANCH == "staging"'
+  needs:
+  - test
+
+# After the deployment we can resume the DAGs
+resume_dags:
+  stage: post-deploy
+  script:
+  - echo "Resuming all Airflow DAGs..."
+  - docker-compose exec ${AIRFLOW_CONTAINER} airflow dags unpause --all
+  rules:
+  - if: '$CI_COMMIT_BRANCH == "staging"'
+  needs:
+  - deploy_to_staging
+  tags:
+  - docker
+
+# Promotion from the staging branch to the main 
+promote_to_main:
+  stage: deploy
+  script:
+  - echo "Promoting changes from staging to main branch..."
+  - git config user.name "GitLab CI"
+  - git config user.email "example@cognitera.gr"
+  - git checkout main
+  - git merge staging
+  - git push origin main
+  rules:
+  - if: '$CI_COMMIT_BRANCH == "staging"'
+  when: manual
+  needs:
+  - deploy_to_staging
+  - resume_dags
+
+# Manual job for deployment to production (main branch)
+#######################################################
+#deploy_to_main:
+#  stage: deploy
+#  script:
+#    - echo "Deploying to production..."
+#     Add your production deployment commands here
+#  rules:
+#    - if: '$CI_COMMIT_BRANCH == "main"'
+#  when: manual
+#  environment:
+#    name: production
+#  needs:
+#    - promote_to_main

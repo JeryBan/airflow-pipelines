@@ -1,0 +1,49 @@
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  DOCKER_DRIVER: overlay2
+
+cache:
+  paths:
+    - .cache/pip
+    - venv/
+
+before_script:
+  - docker info
+  - docker-compose --version
+  - docker --version
+
+build:
+  stage: build
+  script:
+    - docker-compose build
+
+test:
+  stage: test
+  script:
+    # Start the services in detached mode
+    - docker-compose up -d
+    # Wait for services to start
+    - sleep 30
+    # Run tests inside the Airflow scheduler container
+    - docker-compose exec airflow-scheduler pytest
+  after_script:
+    # Clean up the environment
+    - docker-compose down -v
+
+deploy:
+  stage: deploy
+  script:
+    # Deploy the application (this is a placeholder, adjust to your actual deployment process)
+    - echo "Deploying the application..."
+  only:
+    - main
+
+# Trigger the pipeline on any change
+workflow:
+  rules:
+    - changes:
+      - "**/*"
