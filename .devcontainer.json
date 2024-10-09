@@ -1,5 +1,6 @@
 {
   "name": "Airflow Dev Container",
+  "service": "docker",
   "dockerComposeFile": "docker-compose.yaml",
   "extensions": [
     "ms-python.python",
