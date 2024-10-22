@@ -3,3 +3,5 @@ paramiko==3.4.0
 requests==2.32.3
 requests-toolbelt==1.0.0
 pandas
+xlrd
+openpyxl

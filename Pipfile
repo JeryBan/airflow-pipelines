@@ -10,6 +10,8 @@ apache-airflow-providers-postgres = "*"
 torch = "*"
 torchvision = "*"
 pandas = "*"
+xlrd = "*"
+openpyxl = "*"
 
 [dev-packages]
 apache-airflow = "*"

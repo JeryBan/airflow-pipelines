@@ -12,6 +12,7 @@ from core.utils.data import export_xls_from_base64
 
 CURRENT_DIR = Path(os.getcwd())
 DATA_DIR = CURRENT_DIR / 'dags/data'
+CLEANUP = True
 
 default_args = {
     'owner': 'Cognitera',
@@ -39,7 +40,6 @@ def get_payment_status():
         - OPSA_LOGIN_URL
         - evaluation_xls_filters
         - commit_xls_filters
-        - bank_xls_filters
     """
 
     @task(retries=1, task_id='OPSA_login')
@@ -91,56 +91,52 @@ def get_payment_status():
             filename='commit_report.xls'
         )
 
-    @task(retries=2)
-    def get_bank_xls(cookies, ti):
-        """
-        Fetches the payments commit xls.
-        """
-        return base_xls_task(
-            ti=ti,
-            cookies=cookies,
-            request_url="https://osdeopekepe.dikaiomata.gr/RDIIS/rest/BankPayCollection/findLazyBankPayCollection_toExcel",
-            xls_fields=Variable.get('bank_xls_filters'),
-            filename='bank_report.xls'
-        )
-
-    @task.branch()
-    def branch_node(ti):
-        evaluation_xls_path = ti.xcom_pull(task_ids='get_evaluation_xls', key='path')
-        commit_xls_path = ti.xcom_pull(task_ids='get_commit_xls', key='path')
-        base_xls_path = ti.xcom_pull(task_ids='get_bank_xls', key='path')
-
-        if Path(evaluation_xls_path).exists() \
-                and Path(commit_xls_path).exists() \
-                and Path(base_xls_path).exists():
-            return 'construct_dataframes'
-
     @task
     def construct_dataframes(
-            ti,
-            evaluation_xls_path: str = None,
-            commit_xls_path: str = None,
-            bank_xls_path: str = None,
+            evaluation_path=None,
+            commit_path=None,
+            **kwargs
     ):
-        if not (evaluation_xls_path and commit_xls_path and bank_xls_path):
-            evaluation_xls_path = ti.xcom_pull(task_ids='get_evaluation_xls', key='path')
-            commit_xls_path = ti.xcom_pull(task_ids='get_commit_xls', key='path')
-            bank_xls_path = ti.xcom_pull(task_ids='get_bank_xls', key='path')
+        ti = kwargs['ti']
 
-        evaluation_df = pd.read_excel(evaluation_xls_path)
-        commit_df = pd.read_excel(commit_xls_path)
-        bank_df = pd.read_excel(bank_xls_path)
+        if not (evaluation_path and commit_path):
+            evaluation_path = ti.xcom_pull(task_ids='get_evaluation_xls', key='evaluation_report.xls')
+            commit_path = ti.xcom_pull(task_ids='get_commit_xls', key='commit_report.xls')
 
-        df_tmp = pd.merge(evaluation_df, commit_df, on='Αριθμός Παρτίδας')
-        df = pd.merge(df_tmp, bank_df, on='Αριθμός Παρτίδας')
+        evaluation_df = pd.read_excel(evaluation_path)
+        commit_df = pd.read_excel(commit_path)
 
-        return df
+        df = pd.merge(evaluation_df, commit_df, on='Αριθμός Παρτίδας', how='right')
+        df_sorted = df.sort_values(by='Αποτέλεσμα Έγκρισης', ascending=False)
+
+        save_dir = DATA_DIR / 'tmp'
+        Path.mkdir(save_dir, parents=True, exist_ok=True)
+        xls_dir = save_dir / 'final_report.xls'
+
+        df_sorted.to_excel(xls_dir, index=False)
+
+        return df_sorted
+
+    @task
+    def cleanup(ti):
+        evaluation_path = Path(ti.xcom_pull(task_ids='get_evaluation_xls', key='evaluation_report.xls'))
+        commit_path = Path(ti.xcom_pull(task_ids='get_commit_xls', key='commit_report.xls'))
+
+        if evaluation_path.exists():
+            os.remove(evaluation_path)
+            print(f'{evaluation_path} deleted')
+
+        if commit_path.exists():
+            os.remove(commit_path)
+            print(f'{commit_path} deleted')
 
     cookies = login()
     evaluation_xls_path = get_evaluation_xls(cookies=cookies)
     commit_xls_path = get_commit_xls(cookies=cookies)
-    bank_xls_path = get_bank_xls(cookies=cookies)
-    construct_dataframes(evaluation_xls_path, commit_xls_path, bank_xls_path)
+    ret = construct_dataframes(evaluation_xls_path, commit_xls_path)
+
+    if CLEANUP:
+        ret >> cleanup()
 
 
 run = get_payment_status()
@@ -174,8 +170,8 @@ def base_xls_task(
                 encoded_data,
                 filename=filename
             )
-            ti.xcom_push(key='path', value=xls_path)
+            ti.xcom_push(key=filename, value=xls_path)
             return xls_path
     else:
         raise Exception(
-            f"Failed to retrieve xls with status code {xls_response.status_code}: {xls_response.content}")
+            f"Failed to retrieve xls. Status code: {xls_response.status_code}: {xls_response.content}")
