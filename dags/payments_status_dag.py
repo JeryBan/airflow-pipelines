@@ -7,6 +7,7 @@ import pandas as pd
 
 from airflow.decorators import dag, task
 from airflow.models import Variable
+from airflow.utils.trigger_rule import TriggerRule
 
 from core.utils.data import export_xls_from_base64
 
@@ -28,18 +29,20 @@ headers = {
 
 @dag(
     dag_id='payments_status_dag',
+    tags=['m2_1'],
     default_args=default_args,
     schedule_interval=None,
     catchup=False
 )
 def get_payment_status():
     """
-    Airflow Variables needed:
-        - OPSA_USERNAME
-        - OPSA_PASSWORD
-        - OPSA_LOGIN_URL
-        - evaluation_xls_filters
-        - commit_xls_filters
+    **Required Airflow Variables:**
+
+        * OPSA_USERNAME
+        * OPSA_PASSWORD
+        * OPSA_LOGIN_URL
+        * evaluation_xls_filters
+        * commit_xls_filters
     """
 
     @task(retries=1, task_id='OPSA_login')
@@ -66,12 +69,12 @@ def get_payment_status():
             raise Exception(f"Login failed with status code {login_response.status_code}: {login_response.text}")
 
     @task(retries=2)
-    def get_evaluation_xls(cookies, ti):
+    def get_evaluation_xls(cookies, **kwargs):
         """
         Fetches the application evaluation xls.
         """
         return base_xls_task(
-            ti=ti,
+            ti=kwargs['ti'],
             cookies=cookies,
             request_url="https://osdeopekepe.dikaiomata.gr/RDIIS/rest/PaymentEvaluation/findLazyPaymentEvaluation_toExcel",
             xls_fields=Variable.get('evaluation_xls_filters'),
@@ -79,19 +82,19 @@ def get_payment_status():
         )
 
     @task(retries=2)
-    def get_commit_xls(cookies, ti):
+    def get_commit_xls(cookies, **kwargs):
         """
         Fetches the payments commit xls.
         """
         return base_xls_task(
-            ti=ti,
+            ti=kwargs['ti'],
             cookies=cookies,
             request_url="https://osdeopekepe.dikaiomata.gr/RDIIS/rest/PaymentCollectionEvaluation/findLazyPaymentCollectionEvaluation_toExcel",
             xls_fields=Variable.get('commit_xls_filters'),
             filename='commit_report.xls'
         )
 
-    @task
+    @task(trigger_rule=TriggerRule.ALL_SUCCESS)
     def construct_dataframes(
             evaluation_path=None,
             commit_path=None,
@@ -107,7 +110,7 @@ def get_payment_status():
         commit_df = pd.read_excel(commit_path)
 
         df = pd.merge(evaluation_df, commit_df, on='Αριθμός Παρτίδας', how='right')
-        df_sorted = df.sort_values(by='Αποτέλεσμα Έγκρισης', ascending=False)
+        df_sorted = df.sort_values(by='Αριθμός Παρτίδας', ascending=True)
 
         save_dir = DATA_DIR / 'tmp'
         Path.mkdir(save_dir, parents=True, exist_ok=True)
@@ -117,7 +120,7 @@ def get_payment_status():
 
         return df_sorted
 
-    @task
+    @task(depends_on_past=True)
     def cleanup(ti):
         evaluation_path = Path(ti.xcom_pull(task_ids='get_evaluation_xls', key='evaluation_report.xls'))
         commit_path = Path(ti.xcom_pull(task_ids='get_commit_xls', key='commit_report.xls'))
@@ -175,3 +178,5 @@ def base_xls_task(
     else:
         raise Exception(
             f"Failed to retrieve xls. Status code: {xls_response.status_code}: {xls_response.content}")
+
+
