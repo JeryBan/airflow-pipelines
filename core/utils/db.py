@@ -4,14 +4,80 @@ to databases.
 """
 import logging
 
-from airflow.models import connection
+import requests
+from airflow.models import connection, Variable
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from airflow.models.connection import Connection
+from eae_api_client.eaeapiclient import EaeApiClient
 
 
-def perform_query(*args,
+class EaeConnectionManager:
+    """
+    Connection manager for Eae databases.
+    """
+
+    def __init__(self):
+        self.client = None
+        self.conn = None
+
+    def get_db_connection(self):
+        """
+        Returns a connection with eae database.
+        """
+        hook = PostgresHook(postgres_conn_id="eae_vpn")
+        try:
+            self.conn = hook.get_conn()
+            return self.conn
+        except ConnectionRefusedError as e:
+            logging.error(f'Connection Refused: {e}')
+            raise requests.exceptions.ConnectionError
+
+    def get_api_client(self) -> EaeApiClient:
+        """
+        Returns a connection with Eae database.
+
+        Airflow Variables needed:
+
+            * EAE_BACKEND_URL
+            * EAE_TOKEN
+        """
+        eae_backend_url = Variable.get('EAE_BACKEND_URL').rstrip("/")
+        token = Variable.get('EAE_TOKEN')
+
+        authenticated_token = EaeConnectionManager._validate_authentication_token(token)
+
+        self.client = EaeApiClient(eae_backend_url, authenticated_token)
+        return self.client
+
+    def perform_db_query(self, query, many=True, *args, **kwargs):
+        if self.conn is None:
+            self.conn = self.get_db_connection()
+
+        return perform_query(query, self.conn, many, *args)
+
+    @staticmethod
+    def _validate_authentication_token(authentication_token):
+        if len(authentication_token) == 1:
+            msg = 'Invalid token header. No credentials provided.'
+            logging.error(msg)
+            raise ValueError(msg)
+        elif len(authentication_token) > 2:
+            msg = 'Invalid token header. Token string should not contain spaces.'
+            logging.error(msg)
+            raise ValueError(msg)
+
+        try:
+            return authentication_token[1].decode()
+        except (UnicodeError, IndexError):
+            msg = 'Invalid token header. Token string should not contain invalid characters.'
+            logging.error(msg)
+            raise ValueError(msg)
+
+
+def perform_query(query: str,
                   conn: connection,
-                  query: str,
-                  many=True):
+                  many=True,
+                  *args):
     """Performs a query to a specific db.
 
     :param conn: The connection to a db.
@@ -25,10 +91,10 @@ def perform_query(*args,
             cursor.execute(query, args)
 
             if many:
-                queryresult = cursor.fetchall()
+                query_result = cursor.fetchall()
             else:
-                queryresult = cursor.fetchone()
-            return queryresult
+                query_result = cursor.fetchone()
+            return query_result
     except Exception as e:
         logging.error(f"Error executing query: {e}")
         raise
@@ -36,48 +102,7 @@ def perform_query(*args,
         cursor.close()
 
 
-def connect_to_eae() -> connection:
-    """Returns a connection with eae database."""
-    hook = PostgresHook(postgres_conn_id="eae_vpn")
-    try:
-        conn = hook.get_conn()
-        return conn
-    except ConnectionRefusedError as e:
-        logging.error(f'Connection Refused: {e}')
-        raise
-
-from airflow.models.connection import Connection
-from datetime import datetime
-
-
-def perform_query(*args,
-                  conn: Connection,
-                  query: str) -> list:
-    """Runs a query to a specific db.
-
-    :argument args: additional parameters for the query
-    :argument conn: the connection object to the specific db
-    :argument query: query to execute
-
-    :returns: the result of the query executed
-    """
-    cursor = conn.cursor()
-
-    try:
-
-        cursor.execute(query, args)
-
-        queryresult = cursor.fetchall()
-
-        return queryresult
-
-    except Exception as e:
-        print(e)
-    finally:
-        cursor.close()
-
-
-def connect_to_postgres(database: str) -> Connection:
+def connect_to_postgres(database: str) -> connection:
     """Establish a connection with a postgres database.
     :returns: A connection object.
     """
@@ -91,40 +116,6 @@ def connect_to_postgres(database: str) -> Connection:
     except ConnectionError as e:
         print(e)
 
-
-def connect_to_testdb() -> Connection:
-    """Establish a connection with a test db.
-    :returns: A connection object.
-    """
-    hook = PostgresHook(postgres_conn_id="test_localhost")
-    try:
-        conn = hook.get_conn()
-        return conn
-
-    except ConnectionRefusedError as e:
-        print(e)
-    except ConnectionError as e:
-        print(e)
-
-
-def connect_to_testdb() -> connection:
-    """Returns a connection with a test db.
-    Edit connection credentials from the airflow connection tab in the UI."""
-    hook = PostgresHook(postgres_conn_id="test_localhost")
-    try:
-        conn = hook.get_conn()
-        return conn
-    except ConnectionRefusedError as e:
-        logging.error(f'Connection Refused: {e}')
-        raise
-    except ConnectionError as e:
-        print(e)
-
-
-def close_connection(conn: connection) -> None:
-    """Close a connection.
-    :param conn: The connection you want to close.
-    """
 
 def close_connection(conn: Connection) -> None:
     """Close a connection"""

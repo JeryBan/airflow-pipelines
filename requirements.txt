@@ -5,3 +5,4 @@ requests-toolbelt==1.0.0
 pandas
 xlrd
 openpyxl
+./config/wheels/eae_api_client-0.2.0-py2.py3-none-any.whl
