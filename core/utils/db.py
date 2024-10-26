@@ -51,11 +51,11 @@ class EaeConnectionManager:
         self.client = EaeApiClient(eae_backend_url, authenticated_token)
         return self.client
 
-    def perform_db_query(self, query, many=True, *args, **kwargs):
+    def select_query(self, query, many=True, *args, **kwargs):
         if self.conn is None:
             self.conn = self.get_db_connection()
 
-        return perform_query(query, self.conn, many, *args)
+        return perform_select(query, self.conn, many, *args)
 
     @staticmethod
     def _validate_authentication_token(authentication_token):
@@ -76,7 +76,7 @@ class EaeConnectionManager:
             raise ValueError(msg)
 
 
-def perform_query(query: str,
+def perform_select(query: str,
                   conn: connection,
                   many=True,
                   *args):
@@ -102,30 +102,6 @@ def perform_query(query: str,
         raise
     finally:
         cursor.close()
-
-
-def connect_to_postgres(database: str) -> connection:
-    """Establish a connection with a postgres database.
-    :returns: A connection object.
-    """
-    hook = PostgresHook(postgres_conn_id=database)
-    try:
-        conn = hook.get_conn()
-        return conn
-
-    except ConnectionRefusedError as e:
-        print(e)
-    except ConnectionError as e:
-        print(e)
-
-
-def close_connection(conn: Connection) -> None:
-    """Close a connection"""
-    try:
-        conn.close()
-    except ConnectionError as e:
-        logging.error(f'Error closing a connection: {e}')
-        raise
 
 
 class S3BucketManager:
