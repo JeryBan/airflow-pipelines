@@ -1,7 +1,7 @@
 from datetime import timedelta
 from airflow.decorators import dag, task
 from airflow.utils.dates import days_ago
-import paramiko #Connect to SSH servers
+import paramiko  #Connect to SSH servers
 import os
 
 # Define file server 
@@ -10,28 +10,30 @@ FILE_SERVER_HOST = 'file-server-ip'
 FILE_SERVER_PORT = 21
 FILE_SERVER_USER = 'username'
 FILE_SERVER_PASSWORD = 'password'
-FILE_SERVER_DIR = '/path/to/files' #Foreign directory on the file server
+FILE_SERVER_DIR = '/path/to/files'  #Foreign directory on the file server
 
 #Synology NAS settings
 
 NAS_HOST = 'synology-nas-ip'
 NAS_USER = 'nas-username'
 NAS_PASSWORD = 'nas-password'
-NAS_DIR = '/path/to/nas' #Local directory on the Synology NAS
+NAS_DIR = '/path/to/nas'  #Local directory on the Synology NAS
+
 
 @dag(
+    tags=['example'],
     default_args={
         'owner': 'airflow',
         'retries': 1,
-        'retry_delay': timedelta(minutes=1), #Available options: 0, 1, 2, 3, 4, 5, etc
+        'retry_delay': timedelta(minutes=1),  #Available options: 0, 1, 2, 3, 4, 5, etc
     },
     description='A simple DAG to transfer files from a file server to Synology NAS',
-    schedule_interval='@hourly',  # Adjust this to your desired frequency -> Available options: @yearly, @monthly, @weekly, @daily, @hourly, etc.
+    schedule_interval='@hourly',
+    # Adjust this to your desired frequency -> Available options: @yearly, @monthly, @weekly, @daily, @hourly, etc.
     start_date=days_ago(1),
     catchup=False,
 )
 def file_transfer_dag():
-
     @task
     def detect_and_transfer_files():
         # Connect to the file server
@@ -72,6 +74,7 @@ def file_transfer_dag():
 
     # Define task dependencies
     detect_and_transfer_files()
+
 
 # Instantiate the DAG
 file_transfer_dag = file_transfer_dag()

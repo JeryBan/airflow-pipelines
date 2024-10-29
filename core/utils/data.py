@@ -2,12 +2,12 @@
 Utility functions to manipulate data.
 """
 import csv
-import os
 from pathlib import Path
 
+from core.constants import DIRECTORIES
 
-CWD = Path(os.getcwd())
-DATA_DIR = CWD / 'dags/data'
+DATA_DIR = DIRECTORIES.DATA
+TEMP_DIR = DIRECTORIES.TEMP
 
 
 def query_to_csv(query,
@@ -24,9 +24,8 @@ def export_xls_from_base64(data, filename=None):
     """
     import base64
 
-    save_dir = DATA_DIR / 'tmp'
+    save_dir = TEMP_DIR
     path = save_dir / filename
-    Path.mkdir(save_dir, parents=True, exist_ok=True)
 
     decoded_data = base64.b64decode(data)
     with open(path, 'wb') as f:

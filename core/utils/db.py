@@ -3,13 +3,11 @@ Utility functions to manipulate connections
 to databases.
 """
 import logging
+
 import requests
-
 from airflow.models import connection, Variable
-from airflow.providers.postgres.hooks.postgres import PostgresHook
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
-from airflow.models.connection import Connection
-
+from airflow.providers.postgres.hooks.postgres import PostgresHook
 from eae_api_client.eaeapiclient import EaeApiClient
 
 
@@ -20,6 +18,7 @@ class EaeConnectionManager:
 
     def __init__(self):
         self.client = None
+        self.token = None
         self.conn = None
 
     def get_db_connection(self):
@@ -34,21 +33,19 @@ class EaeConnectionManager:
             logging.error(f'Connection Refused: {e}')
             raise requests.exceptions.ConnectionError
 
-    def get_api_client(self) -> EaeApiClient:
+    def get_api_client(self, **kwargs) -> EaeApiClient:
         """
         Returns a connection with Eae database.
 
         Airflow Variables needed:
 
             * EAE_BACKEND_URL
-            * EAE_TOKEN
+            * token (in kwargs['params']): The authentication token for EAE.
         """
         eae_backend_url = Variable.get('EAE_BACKEND_URL').rstrip("/")
-        token = Variable.get('EAE_TOKEN')
+        token = EaeConnectionManager.extract_token(**kwargs)
 
-        authenticated_token = EaeConnectionManager._validate_authentication_token(token)
-
-        self.client = EaeApiClient(eae_backend_url, authenticated_token)
+        self.client = EaeApiClient(eae_backend_url, token)
         return self.client
 
     def select_query(self, query, many=True, *args, **kwargs):
@@ -58,22 +55,28 @@ class EaeConnectionManager:
         return perform_select(query, self.conn, many, *args)
 
     @staticmethod
-    def _validate_authentication_token(authentication_token):
-        if len(authentication_token) == 1:
-            msg = 'Invalid token header. No credentials provided.'
+    def extract_token(**kwargs) -> str:
+        try:
+            token = kwargs['params']['token']
+            return EaeConnectionManager._validate_authentication_token(token)
+        except KeyError:
+            msg = 'Token missing. Ensure you are correctly passing the token through @dag params keyword argument.'
             logging.error(msg)
-            raise ValueError(msg)
-        elif len(authentication_token) > 2:
-            msg = 'Invalid token header. Token string should not contain spaces.'
+            raise KeyError(msg)
+
+    @staticmethod
+    def _validate_authentication_token(authentication_token):
+        if not authentication_token:
+            msg = 'Authentication token is null'
             logging.error(msg)
             raise ValueError(msg)
 
-        try:
-            return authentication_token[1].decode()
-        except (UnicodeError, IndexError):
-            msg = 'Invalid token header. Token string should not contain invalid characters.'
+        if ' ' in authentication_token:
+            msg = 'Invalid token. Token string should not contain spaces.'
             logging.error(msg)
             raise ValueError(msg)
+
+        return authentication_token
 
 
 def perform_select(query: str,

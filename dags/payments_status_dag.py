@@ -10,9 +10,10 @@ from airflow.models import Variable
 from airflow.utils.trigger_rule import TriggerRule
 
 from core.utils.data import export_xls_from_base64
+from core.constants import DIRECTORIES
 
-CURRENT_DIR = Path(os.getcwd())
-DATA_DIR = CURRENT_DIR / 'dags/data'
+DATA_DIR = DIRECTORIES.DATA
+
 CLEANUP = True
 
 default_args = {
@@ -106,21 +107,21 @@ def get_payment_status():
             evaluation_path = ti.xcom_pull(task_ids='get_evaluation_xls', key='evaluation_report.xls')
             commit_path = ti.xcom_pull(task_ids='get_commit_xls', key='commit_report.xls')
 
-        evaluation_df = pd.read_excel(evaluation_path)
-        commit_df = pd.read_excel(commit_path)
+        evaluation_df = pd.read_excel(evaluation_path, dtype=str)
+        commit_df = pd.read_excel(commit_path, dtype=str)
 
-        df = pd.merge(evaluation_df, commit_df, on='Αριθμός Παρτίδας', how='right')
-        df_sorted = df.sort_values(by='Αριθμός Παρτίδας', ascending=True)
+        merged_df = pd.merge(evaluation_df, commit_df, on='Αριθμός Παρτίδας', how='right')
+        df = merged_df.sort_values(by='Αριθμός Παρτίδας', ascending=True)
 
-        save_dir = DATA_DIR / 'tmp'
+        save_dir = DATA_DIR / 'm21'
         Path.mkdir(save_dir, parents=True, exist_ok=True)
         xls_dir = save_dir / 'final_report.xls'
 
-        df_sorted.to_excel(xls_dir, index=False)
+        df.to_excel(xls_dir, index=False)
 
-        return df_sorted
+        return df
 
-    @task(depends_on_past=True)
+    @task
     def cleanup(ti):
         evaluation_path = Path(ti.xcom_pull(task_ids='get_evaluation_xls', key='evaluation_report.xls'))
         commit_path = Path(ti.xcom_pull(task_ids='get_commit_xls', key='commit_report.xls'))
@@ -142,7 +143,7 @@ def get_payment_status():
         ret >> cleanup()
 
 
-run = get_payment_status()
+get_payment_status = get_payment_status()
 
 
 def base_xls_task(
@@ -178,5 +179,3 @@ def base_xls_task(
     else:
         raise Exception(
             f"Failed to retrieve xls. Status code: {xls_response.status_code}: {xls_response.content}")
-
-
