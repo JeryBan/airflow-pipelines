@@ -7,7 +7,6 @@ import logging
 from airflow.decorators import dag, task
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
-
 CURRENT_DIR = Path(os.getcwd())
 DUMP_DIR = CURRENT_DIR / "dags/dumps"
 
@@ -17,8 +16,8 @@ default_args = {
     'retry_delay': timedelta(seconds=10)
 }
 
+
 @dag(
-    id='save_game_dag',
     tags=['airflow'],
     default_args=default_args,
     catchup=False,
@@ -33,31 +32,30 @@ def save_game():
     """
 
     @task
-    def connect():
+    def connect(ti):
         hook = PostgresHook(postgres_conn_id='airflow_db')
         conn = hook.get_conn()
 
-        db_user = conn.login
-        db_password = conn.password
-        db_host = conn.host
-        db_port = conn.port
-        db_name = conn.dbname
+        db_user = conn.info.user
+        db_password = conn.info.password
+        db_host = conn.info.host
+        db_port = conn.info.port
+        db_name = conn.info.dbname
 
         Path.mkdir(DUMP_DIR, parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%d%m%Y-%H%M%S")
         filename = f'airflow_save_{timestamp}.dump'
         of = DUMP_DIR / filename
 
-        os.environ['PGPASSWORD'] = db_password
-
-        cmd = f"pg_dump -U {db_user} -h {db_host} -p {db_port} -d {db_name} -F c -b -v -f {of}"
+        cmd = f"PGPASSWORD={db_password} pg_dump -U {db_user} -h {db_host} -p {db_port} -d {db_name} -F c -b -v -f {of}"
         return cmd
 
-    @task.bash(env={'PGPASSWORD': os.getenv('PGPASSWORD')})
-    def create_dump(command):
+    @task.bash()
+    def create_dump(command: str):
         return command
 
     command = connect()
     create_dump(command)
+
 
 save_game()
