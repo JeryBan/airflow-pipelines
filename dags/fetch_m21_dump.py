@@ -1,9 +1,10 @@
+import tempfile
 from datetime import timedelta
 from pathlib import Path
 
 from airflow.decorators import dag, task
-from airflow.providers.sftp.hooks.sftp import SFTPHook
-from airflow.providers.ssh.operators.ssh import SSHOperator
+from airflow.providers.ssh.hooks.ssh import SSHHook
+from paramiko import SSHClient, AutoAddPolicy
 
 from core.share import DIRECTORIES
 
@@ -47,6 +48,7 @@ def fetch_m21_dump():
     **Requires:**
 
         * conn_id: m21_webserver
+        * fetch_available_m21_dumps_list dag needs to be run first
     """
 
     @task
@@ -55,32 +57,43 @@ def fetch_m21_dump():
             if v:
                 return k
 
-    copy_from_db = SSHOperator(
-        task_id='retrieve_dump_from_db',
-        ssh_conn_id='m21_webserver',
-        conn_timeout=None,
-        cmd_timeout=None,
-        command=f'scp database_server:{{ti.xcom_pull(key="filepath", task_ids="get_filepath")}} ',
-    )
-
     @task
-    def copy_file_from_server():
-        sftp_hook = SFTPHook(ssh_conn_id="m21_webserver")
-
-        remote_filepath = '/root/ypaat-backup-2024-10-29.sql'
+    def copy_file_through_webserver(**kwargs):
+        remote_filepath = kwargs['ti'].xcom_pull(task_ids="get_filepath")
         local_filepath = DUMP_DIR / 'm21_dump.sql'
 
-        sftp_hook.retrieve_file(remote_filepath, local_filepath)
+        # Get webserver connection
+        web_hook = SSHHook(ssh_conn_id="m21_webserver")
 
-    cleanup = SSHOperator(
-        task_id='clean_up',
-        ssh_conn_id='m21_webserver',
-        conn_timeout=None,
-        cmd_timeout=None,
-        command='rm -f /root/ypaat-backup-2024-10-29.sql',
-    )
+        # Connect to webserver using system's default SSH config
+        web_client = SSHClient()
+        web_client.set_missing_host_key_policy(AutoAddPolicy())
+        web_client.connect(
+            hostname=web_hook.remote_host,
+            username=web_hook.username,
+            look_for_keys=True,
+            allow_agent=True
+        )
 
-    get_filepath() >> copy_from_db >> copy_file_from_server() >> cleanup
+        # Create a temporary directory for intermediate transfer
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # rsync from database server to webserver's temp directory
+            stdin, stdout, stderr = web_client.exec_command(
+                f'rsync -av database_server:{remote_filepath} {temp_dir}/'
+            )
+            if stdout.channel.recv_exit_status() != 0:
+                raise Exception(f"Rsync from database server failed: {stderr.read().decode()}")
+
+            # SFTP to get the file from webserver to local
+            sftp = web_client.open_sftp()
+            temp_filepath = next(Path(temp_dir).iterdir())
+            sftp.get(str(temp_filepath), str(local_filepath))
+
+            sftp.close()
+
+        web_client.close()
+
+    get_filepath() >> copy_file_through_webserver()
 
 
 m21_latest_dump_dag = fetch_m21_dump()
