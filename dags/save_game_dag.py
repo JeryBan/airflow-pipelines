@@ -4,7 +4,7 @@ from airflow.decorators import dag, task
 from airflow.models import Variable
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 
-from core.constants import DIRECTORIES
+from core.share import DIRECTORIES
 
 DUMP_DIR = DIRECTORIES.DUMPS
 

@@ -10,7 +10,7 @@ from airflow.models import Variable
 from airflow.utils.trigger_rule import TriggerRule
 
 from core.utils.data import export_xls_from_base64
-from core.constants import DIRECTORIES
+from core.share import DIRECTORIES
 
 DATA_DIR = DIRECTORIES.DATA
 
@@ -29,7 +29,7 @@ headers = {
 
 
 @dag(
-    dag_id='payments_status_dag',
+    dag_id='opsa_payments_status_dag',
     tags=['m2_1'],
     default_args=default_args,
     schedule_interval=None,

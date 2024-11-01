@@ -4,7 +4,7 @@ Utility functions to manipulate data.
 import csv
 from pathlib import Path
 
-from core.constants import DIRECTORIES
+from core.share import DIRECTORIES
 
 DATA_DIR = DIRECTORIES.DATA
 TEMP_DIR = DIRECTORIES.TEMP

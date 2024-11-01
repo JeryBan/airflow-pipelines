@@ -13,6 +13,8 @@ torchvision = "*"
 pandas = "*"
 xlrd = "*"
 openpyxl = "*"
+apache-airflow-providers-ssh = "*"
+apache-airflow-providers-sftp = "*"
 
 [dev-packages]
 apache-airflow = "*"
