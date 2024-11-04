@@ -1,12 +1,12 @@
-import tempfile
 from datetime import timedelta
 from pathlib import Path
 
 from airflow.decorators import dag, task
-from airflow.providers.ssh.hooks.ssh import SSHHook
-from paramiko import SSHClient, AutoAddPolicy
+from airflow.providers.sftp.hooks.sftp import SFTPHook
+from airflow.providers.ssh.operators.ssh import SSHOperator
 
 from core.share import DIRECTORIES
+from core.utils.db import remove_blob_columns
 
 DUMP_DIR = DIRECTORIES.DUMPS
 TEMP_DIR = DIRECTORIES.TEMP
@@ -58,42 +58,40 @@ def fetch_m21_dump():
                 return k
 
     @task
-    def copy_file_through_webserver(**kwargs):
+    def copy_file_from_db(**kwargs):
         remote_filepath = kwargs['ti'].xcom_pull(task_ids="get_filepath")
+
+        copy_from_db = SSHOperator(
+            task_id='retrieve_dump_from_db',
+            ssh_conn_id='m21_webserver',
+            conn_timeout=None,
+            cmd_timeout=None,
+            command=f'scp database_server:{{ remote_filepath }} /tmp/m21_dump.sql',
+        )
+        copy_from_db.execute(context={})
+
+    @task
+    def retrieve_file_from_webserver(**kwargs):
+        remote_filepath = '/tmp/m21_dump.sql'
         local_filepath = DUMP_DIR / 'm21_dump.sql'
 
-        # Get webserver connection
-        web_hook = SSHHook(ssh_conn_id="m21_webserver")
+        sftp_hook = SFTPHook(ssh_conn_id="m21_webserver")
+        sftp_hook.retrieve_file(remote_filepath, local_filepath)
 
-        # Connect to webserver using system's default SSH config
-        web_client = SSHClient()
-        web_client.set_missing_host_key_policy(AutoAddPolicy())
-        web_client.connect(
-            hostname=web_hook.remote_host,
-            username=web_hook.username,
-            look_for_keys=True,
-            allow_agent=True
-        )
+    @task
+    def remove_blobs(**kwargs):
+        local_filepath = DUMP_DIR / 'm21_dump.sql'
+        remove_blob_columns(local_filepath, local_filepath)
 
-        # Create a temporary directory for intermediate transfer
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # rsync from database server to webserver's temp directory
-            stdin, stdout, stderr = web_client.exec_command(
-                f'rsync -av database_server:{remote_filepath} {temp_dir}/'
-            )
-            if stdout.channel.recv_exit_status() != 0:
-                raise Exception(f"Rsync from database server failed: {stderr.read().decode()}")
+    cleanup = SSHOperator(
+        task_id='clean_up',
+        ssh_conn_id='m21_webserver',
+        conn_timeout=None,
+        cmd_timeout=None,
+        command='rm -f /tmp/m21_dump.sql',
+    )
 
-            # SFTP to get the file from webserver to local
-            sftp = web_client.open_sftp()
-            temp_filepath = next(Path(temp_dir).iterdir())
-            sftp.get(str(temp_filepath), str(local_filepath))
-
-            sftp.close()
-
-        web_client.close()
-
-    get_filepath() >> copy_file_through_webserver()
+    get_filepath() >> copy_file_from_db() >> retrieve_file_from_webserver() >> [remove_blobs(), cleanup]
 
 
 m21_latest_dump_dag = fetch_m21_dump()

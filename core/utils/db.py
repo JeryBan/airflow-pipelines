@@ -3,6 +3,7 @@ Utility functions to manipulate connections
 to databases.
 """
 import logging
+import re
 
 import requests
 from airflow.models import connection, Variable
@@ -215,3 +216,21 @@ class S3BucketManager:
             wildcard_match=True
         )
         return f
+
+
+def remove_blob_columns(input_file, output_file):
+    try:
+        with open(input_file, 'rb') as file:
+            lines = file.readlines()
+    except Exception as e:
+        print(f"Error reading {input_file}: {e}")
+        return
+
+    with open(output_file, 'wb') as file:
+        for line in lines:
+            try:
+                line_decoded = line.decode('utf-8')
+                if not re.search(r'\bBLOB\b', line_decoded, re.IGNORECASE):
+                    file.write(line)
+            except UnicodeDecodeError:
+                continue
