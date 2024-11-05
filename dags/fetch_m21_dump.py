@@ -58,40 +58,49 @@ def fetch_m21_dump():
                 return k
 
     @task
-    def copy_file_from_db(**kwargs):
-        remote_filepath = kwargs['ti'].xcom_pull(task_ids="get_filepath")
-
+    def copy_file_from_db(remote_filepath: str):
         copy_from_db = SSHOperator(
             task_id='retrieve_dump_from_db',
             ssh_conn_id='m21_webserver',
             conn_timeout=None,
             cmd_timeout=None,
-            command=f'scp database_server:{{ remote_filepath }} /tmp/m21_dump.sql',
+            command=f'scp database_server:{remote_filepath} /tmp/',
         )
         copy_from_db.execute(context={})
 
     @task
-    def retrieve_file_from_webserver(**kwargs):
-        remote_filepath = '/tmp/m21_dump.sql'
-        local_filepath = DUMP_DIR / 'm21_dump.sql'
+    def retrieve_file_from_webserver(remote_filepath: str):
+        name_idx = remote_filepath.index("ypaat-backup-")
+        filename = remote_filepath[name_idx:]
+
+        sftp_remote_filepath = f'/tmp/{filename}'
+        local_filepath = DUMP_DIR / filename
 
         sftp_hook = SFTPHook(ssh_conn_id="m21_webserver")
-        sftp_hook.retrieve_file(remote_filepath, local_filepath)
+        sftp_hook.retrieve_file(sftp_remote_filepath, local_filepath)
+
+        return filename
 
     @task
-    def remove_blobs(**kwargs):
-        local_filepath = DUMP_DIR / 'm21_dump.sql'
+    def remove_blobs(filename: str):
+        local_filepath = DUMP_DIR / filename
         remove_blob_columns(local_filepath, local_filepath)
 
-    cleanup = SSHOperator(
-        task_id='clean_up',
-        ssh_conn_id='m21_webserver',
-        conn_timeout=None,
-        cmd_timeout=None,
-        command='rm -f /tmp/m21_dump.sql',
-    )
+    @task
+    def cleanup(filename: str):
+        c = SSHOperator(
+            task_id='clean_up',
+            ssh_conn_id='m21_webserver',
+            conn_timeout=None,
+            cmd_timeout=None,
+            command=f'rm -f /tmp/{filename}'
+        )
+        c.execute(context={})
 
-    get_filepath() >> copy_file_from_db() >> retrieve_file_from_webserver() >> [remove_blobs(), cleanup]
+    remote_filepath = get_filepath()
+    filename = retrieve_file_from_webserver(remote_filepath)
+
+    copy_file_from_db(remote_filepath) >> filename >> [remove_blobs(filename), cleanup(filename)]
 
 
 m21_latest_dump_dag = fetch_m21_dump()
