@@ -26,7 +26,7 @@ def read_keys_from_file(file_path) -> dict:
     where keys are the lines from the file.
     """
     if not Path(file_path).is_file():
-        raise FileNotFoundError(f"{file_path} does not exist.")
+        return {}
 
     with open(file_path, 'r') as file:
         # Read lines and strip whitespace
@@ -53,6 +53,8 @@ def fetch_m21_dump():
 
     @task
     def get_filepath(**kwargs):
+        if len(kwargs['params'].items()) < 1:
+            raise FileNotFoundError('No m21 dump list found.')
         for k, v in kwargs['params'].items():
             if v:
                 return k

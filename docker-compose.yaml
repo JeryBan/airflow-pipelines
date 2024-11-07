@@ -67,7 +67,7 @@ x-airflow-common: &airflow-common
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     # The following line can be used to set a custom config file, stored in the local config folder
     # If you want to use it, outcomment it and replace custom_airflow.cfg with the name of your config file
-    # AIRFLOW_CONFIG: '/opt/airflow/config/custom_airflow.cfg'
+    AIRFLOW_CONFIG: '/opt/airflow/config/custom_airflow.cfg'
     PYTHONPATH: "/opt/airflow/"
   volumes:
   - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags

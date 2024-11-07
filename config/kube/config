@@ -6,6 +6,7 @@ contexts:
 - context:
     cluster: new-farmers-AKS
     user: clusterUser_newfarmers_new-farmers-AKS
+    namespace: staging
   name: new-farmers-AKS
 - context:
     cluster: cognitor-aks

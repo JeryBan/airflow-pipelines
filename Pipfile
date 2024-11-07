@@ -15,6 +15,7 @@ xlrd = "*"
 openpyxl = "*"
 apache-airflow-providers-ssh = "*"
 apache-airflow-providers-sftp = "*"
+apache-airflow-providers-cncf-kubernetes = "*"
 
 [dev-packages]
 apache-airflow = "*"
