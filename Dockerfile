@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y \
 
 USER airflow
 
+USER airflow
+
 # Set the working directory
 WORKDIR /opt/airflow
 
