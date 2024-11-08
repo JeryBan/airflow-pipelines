@@ -67,7 +67,7 @@ x-airflow-common: &airflow-common
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     # The following line can be used to set a custom config file, stored in the local config folder
     # If you want to use it, outcomment it and replace custom_airflow.cfg with the name of your config file
-    # AIRFLOW_CONFIG: '/opt/airflow/config/custom_airflow.cfg'
+    AIRFLOW_CONFIG: '/opt/airflow/config/custom_airflow.cfg'
     PYTHONPATH: "/opt/airflow/"
   volumes:
   - ${AIRFLOW_PROJ_DIR:-.}/dags:/opt/airflow/dags
@@ -88,7 +88,7 @@ services:
       POSTGRES_PASSWORD: airflow
       POSTGRES_DB: airflow
     ports:
-    - 5430:5432
+    - "5430:5432"
     volumes:
     - postgres-db-volume:/var/lib/postgresql/data
     healthcheck:
@@ -195,8 +195,8 @@ services:
         echo "   https://airflow.apache.org/docs/apache-airflow/stable/howto/docker-compose/index.html#before-you-begin"
         echo
       fi
-      mkdir -p /sources/logs /sources/dags /sources/plugins /sources/core
-      chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins,core}
+      mkdir -p /sources/logs /sources/dags /sources/plugins /sources/core /sources/config
+      chown -R "${AIRFLOW_UID}:0" /sources/{logs,dags,plugins,core, config}      
       exec /entrypoint airflow version
     # yamllint enable rule:line-length
     environment:

@@ -15,7 +15,8 @@ default_args = {
 }
 
 
-@dag(dag_id="Συμφωνητικα",
+@dag(dag_id="ssh_dag_example",
+     tags=['example'],
      default_args=default_args,
      catchup=False)
 def copy_contracts():

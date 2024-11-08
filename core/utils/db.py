@@ -3,15 +3,87 @@ Utility functions to manipulate connections
 to databases.
 """
 import logging
+import re
 
-from airflow.models import connection
+import requests
+from airflow.models import connection, Variable
+from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
+from eae_api_client.eaeapiclient import EaeApiClient
 
 
-def perform_query(*args,
+class EaeConnectionManager:
+    """
+    Connection manager for Eae databases.
+    """
+
+    def __init__(self):
+        self.client = None
+        self.token = None
+        self.conn = None
+
+    def get_db_connection(self):
+        """
+        Returns a connection with eae database.
+        """
+        hook = PostgresHook(postgres_conn_id="eae_vpn")
+        try:
+            self.conn = hook.get_conn()
+            return self.conn
+        except ConnectionRefusedError as e:
+            logging.error(f'Connection Refused: {e}')
+            raise requests.exceptions.ConnectionError
+
+    def get_api_client(self, **kwargs) -> EaeApiClient:
+        """
+        Returns a connection with Eae database.
+
+        Airflow Variables needed:
+
+            * EAE_BACKEND_URL
+            * token (in kwargs['params']): The authentication token for EAE.
+        """
+        eae_backend_url = Variable.get('EAE_BACKEND_URL').rstrip("/")
+        token = EaeConnectionManager.extract_token(**kwargs)
+
+        self.client = EaeApiClient(eae_backend_url, token)
+        return self.client
+
+    def select_query(self, query, many=True, *args, **kwargs):
+        if self.conn is None:
+            self.conn = self.get_db_connection()
+
+        return perform_select(query, self.conn, many, *args)
+
+    @staticmethod
+    def extract_token(**kwargs) -> str:
+        try:
+            token = kwargs['params']['token']
+            return EaeConnectionManager._validate_authentication_token(token)
+        except KeyError:
+            msg = 'Token missing. Ensure you are correctly passing the token through @dag params keyword argument.'
+            logging.error(msg)
+            raise KeyError(msg)
+
+    @staticmethod
+    def _validate_authentication_token(authentication_token):
+        if not authentication_token:
+            msg = 'Authentication token is null'
+            logging.error(msg)
+            raise ValueError(msg)
+
+        if ' ' in authentication_token:
+            msg = 'Invalid token. Token string should not contain spaces.'
+            logging.error(msg)
+            raise ValueError(msg)
+
+        return authentication_token
+
+
+def perform_select(query: str,
                   conn: connection,
-                  query: str,
-                  many=True):
+                  many=True,
+                  *args):
     """Performs a query to a specific db.
 
     :param conn: The connection to a db.
@@ -25,10 +97,10 @@ def perform_query(*args,
             cursor.execute(query, args)
 
             if many:
-                queryresult = cursor.fetchall()
+                query_result = cursor.fetchall()
             else:
-                queryresult = cursor.fetchone()
-            return queryresult
+                query_result = cursor.fetchone()
+            return query_result
     except Exception as e:
         logging.error(f"Error executing query: {e}")
         raise
@@ -36,100 +108,129 @@ def perform_query(*args,
         cursor.close()
 
 
-def connect_to_eae() -> connection:
-    """Returns a connection with eae database."""
-    hook = PostgresHook(postgres_conn_id="eae_vpn")
-    try:
-        conn = hook.get_conn()
-        return conn
-    except ConnectionRefusedError as e:
-        logging.error(f'Connection Refused: {e}')
-        raise
-
-from airflow.models.connection import Connection
-from datetime import datetime
-
-
-def perform_query(*args,
-                  conn: Connection,
-                  query: str) -> list:
-    """Runs a query to a specific db.
-
-    :argument args: additional parameters for the query
-    :argument conn: the connection object to the specific db
-    :argument query: query to execute
-
-    :returns: the result of the query executed
+class S3BucketManager:
     """
-    cursor = conn.cursor()
+    Manager to handle S3 bucket connections and file operations.
+    """
+    def __init__(self, aws_conn_id='minio_localhost', bucket_name=None):
+        """
+        Args:
+            aws_conn_id (str, optional): airflow connection id. Defaults to 'minio_localhost'.
+            bucket_name (str, optional): S3 bucket name. Set if you want to operate on a single bucket.
+        """
+        self.hook = S3Hook(aws_conn_id=aws_conn_id)
+        self.bucket_name = bucket_name
 
+    def upload_file(
+            self,
+            local_file_path: str,
+            destination_path: str,
+            bucket_name: str = None,
+            replace=True
+    ) -> str:
+        """
+        Uploads a file from a local path to a specified destination path within an S3 bucket.
+
+        Args:
+            local_file_path (str): Local path of the file to upload.
+            destination_path (str): Destination path within the S3 bucket.
+            bucket_name (str, optional): Name of the S3 bucket. Uses the class default if not provided.
+            replace (bool, optional): If True, replaces any existing file at the destination path. Default is True.
+
+        Returns:
+            str: The S3 URI of the uploaded file.
+        """
+        if bucket_name:
+            self.bucket_name = bucket_name
+
+        self.hook.load_file(
+            filename=local_file_path,
+            key=destination_path,
+            bucket_name=self.bucket_name,
+            replace=replace
+        )
+
+        return f's3://{bucket_name}/{destination_path}'
+
+    def download_file(
+            self,
+            destination_path: str,
+            local_path: str,
+            bucket_name: str = None,
+            **kwargs
+    ) -> str:
+        """
+        Downloads a file from a specified path within an S3 bucket to a local path.
+
+        Args:
+            destination_path (str): Path of the file within the S3 bucket.
+            local_path (str): Local path to save the downloaded file.
+            bucket_name (str, optional): Name of the S3 bucket. Uses the class default if not provided.
+            **kwargs: Optional parameters.
+                use_autogenerated_subdir (bool, optional): If True, adds an autogenerated subdirectory to the download location.
+
+        Returns:
+            str: The path to the downloaded file.
+        """
+        if bucket_name:
+            self.bucket_name = bucket_name
+
+        auto = kwargs.get('use_autogenerated_subdir', False)
+
+        f = self.hook.download_fileobj(
+            key=destination_path,
+            local_path=local_path,
+            bucket_name=self.bucket_name,
+            preserve_file_name=True,
+            use_autogenerated_subdir=auto
+        )
+        return f
+
+    def get_by_pattern(
+            self,
+            pattern: str,
+            bucket_name: str = None,
+            **kwargs
+    ):
+        """
+        Fetches files from an S3 bucket based on a specified pattern.
+
+        Args:
+            pattern (str): Pattern for matching file names within the S3 bucket.
+            bucket_name (str, optional): Name of the S3 bucket. Uses the class default if not provided.
+            **kwargs: Optional parameters.
+                delimiter (str, optional): The delimiter to use for folder separation.
+
+        Returns:
+            str: The S3 key of the matching file(s).
+        """
+        if bucket_name:
+            self.bucket_name = bucket_name
+
+        delimiter = kwargs.get('delimiter', '')
+
+        f = self.hook.get_wildcard_key(
+            wildcard_key=pattern,
+            bucket_name=self.bucket_name,
+            delimiter=delimiter,
+            wildcard_match=True
+        )
+        return f
+
+
+def remove_blob_columns(input_file, output_file):
     try:
-
-        cursor.execute(query, args)
-
-        queryresult = cursor.fetchall()
-
-        return queryresult
-
+        with open(input_file, 'rb') as file:
+            lines = file.readlines()
     except Exception as e:
-        print(e)
-    finally:
-        cursor.close()
+        print(f"Error reading {input_file}: {e}")
+        return
 
-
-def connect_to_postgres(database: str) -> Connection:
-    """Establish a connection with a postgres database.
-    :returns: A connection object.
-    """
-    hook = PostgresHook(postgres_conn_id=database)
-    try:
-        conn = hook.get_conn()
-        return conn
-
-    except ConnectionRefusedError as e:
-        print(e)
-    except ConnectionError as e:
-        print(e)
-
-
-def connect_to_testdb() -> Connection:
-    """Establish a connection with a test db.
-    :returns: A connection object.
-    """
-    hook = PostgresHook(postgres_conn_id="test_localhost")
-    try:
-        conn = hook.get_conn()
-        return conn
-
-    except ConnectionRefusedError as e:
-        print(e)
-    except ConnectionError as e:
-        print(e)
-
-
-def connect_to_testdb() -> connection:
-    """Returns a connection with a test db.
-    Edit connection credentials from the airflow connection tab in the UI."""
-    hook = PostgresHook(postgres_conn_id="test_localhost")
-    try:
-        conn = hook.get_conn()
-        return conn
-    except ConnectionRefusedError as e:
-        logging.error(f'Connection Refused: {e}')
-        raise
-    except ConnectionError as e:
-        print(e)
-
-
-def close_connection(conn: connection) -> None:
-    """Close a connection.
-    :param conn: The connection you want to close.
-    """
-
-def close_connection(conn: Connection) -> None:
-    """Close a connection"""
-    try:
-        conn.close()
-    except ConnectionError as e:
-        logging.error(f'Error closing a connection: {e}')
-        raise
+    with open(output_file, 'wb') as file:
+        for line in lines:
+            try:
+                line_decoded = line.decode('utf-8')
+                if not re.search(r'\bBLOB\b', line_decoded, re.IGNORECASE):
+                    file.write(line)
+            except UnicodeDecodeError:
+                continue

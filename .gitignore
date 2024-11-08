@@ -84,4 +84,6 @@ ipython_config.py
 # airflow
 secrets.py
 logs/*
-dags/data/ 
+dags/data/
+dags/dumps/
+dags/tmp/
