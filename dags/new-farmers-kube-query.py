@@ -1,20 +1,24 @@
-from datetime import timedelta
 import csv
+import os
+from datetime import timedelta
 
 from airflow.decorators import dag, task
 from airflow.models import Variable
 from airflow.operators.python import PythonOperator
-from airflow.providers.postgres.hooks.postgres import PostgresHook
-from kubernetes import client, config, stream
 
-from core.share import DIRECTORIES
+from core.share import DIRECTORIES, URLS
+from core.utils.db import run_query_in_pod
 
-TEMP_DIR = DIRECTORIES.TEMP
+DATA_DIR = DIRECTORIES.DATA
 CONF_DIR = DIRECTORIES.CONFIG
+DOWNLOAD_URL = URLS.DOWNLOAD
+
 
 POD_NAME = Variable.get("new-farmers-staging-worker-pod-name")
+NAMESPACE = 'staging'
+CONN_ID = 'new-farmers-staging-db'
+KUBE_CONF_PATH = f'{CONF_DIR}/kube/config'
 
-config.load_kube_config(config_file=f'{CONF_DIR}/kube/config')
 
 default_args = {
     'owner': 'Cognitera',
@@ -23,50 +27,38 @@ default_args = {
 }
 
 
-def run_query_in_pod(query):
-    v1 = client.CoreV1Api()
-
-    db_hook = PostgresHook(postgres_conn_id='new-farmers-staging-db')
-    conn = db_hook.get_connection(conn_id='new-farmers-staging-db')
-
-    exec_command = [
-        "sh", "-c",
-        f"PGPASSWORD='{conn.password}' psql -h {conn.host} -p {conn.port} -U {conn.login} -d {conn.schema} -c \"{query}\""
-    ]
-
-    response = stream.stream(
-        v1.connect_get_namespaced_pod_exec,
-        POD_NAME,
-        'staging',
-        command=exec_command,
-        stderr=True,
-        stdin=False,
-        stdout=True,
-        tty=False,
-    )
-    return f"Command output: {response}"
-
-
 @dag(
     dag_id='new-farmers-kube-query.py',
     tags=['new-farmers'],
     default_args=default_args,
     schedule_interval=None,
     catchup=False,
-    params={'query': None}
+    params={
+        'query': None,
+        'namespace': NAMESPACE,
+        'pod_name': POD_NAME,
+        'conn_id': CONN_ID,
+        'kube_conf_path': KUBE_CONF_PATH
+    }
 )
 def kube_query_dag():
-    run_query_task_1 = PythonOperator(
+    run_query_task = PythonOperator(
         task_id='run_query',
         python_callable=run_query_in_pod,
-        op_args=["{{ params.query }}"],
+        op_kwargs={
+            "query": "{{ params.query }}",
+            "namespace": "{{ params.namespace }}",
+            "pod_name": "{{ params.pod_name }}",
+            "conn_id": "{{ params.conn_id }}",
+            "kube_config_path": "{{ params.kube_conf_path }}"
+        },
         do_xcom_push=True
     )
 
     @task
-    def query_to_csv_transform(ti):
+    def query_to_csv(ti):
         response = ti.xcom_pull(task_ids='run_query')
-        save_path = f'{TEMP_DIR}/new-farmers-qs.csv'
+        save_path = f'{DATA_DIR}/new-farmers-qs.csv'
 
         if not response.startswith("Command output: ERROR:"):
             rows = response.splitlines()
@@ -85,7 +77,13 @@ def kube_query_dag():
                 writer.writerow(headers)
                 writer.writerows(data)
 
-    run_query_task_1 >> query_to_csv_transform()
+            filename = os.path.basename(save_path)
+            download_path = f'{DOWNLOAD_URL}/{filename}'
+
+            print(f"http://localhost:8080/download/{filename}")
+            return download_path
+
+    run_query_task >> query_to_csv()
 
 
 kube_query_dag = kube_query_dag()

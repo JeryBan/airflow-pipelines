@@ -11,6 +11,9 @@ from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.postgres.hooks.postgres import PostgresHook
 from eae_api_client.eaeapiclient import EaeApiClient
 
+from core.share import DIRECTORIES
+
+CONF_DIR = DIRECTORIES.CONFIG
 
 class EaeConnectionManager:
     """
@@ -81,9 +84,9 @@ class EaeConnectionManager:
 
 
 def perform_select(query: str,
-                  conn: connection,
-                  many=True,
-                  *args):
+                   conn: connection,
+                   many=True,
+                   *args):
     """Performs a query to a specific db.
 
     :param conn: The connection to a db.
@@ -112,6 +115,7 @@ class S3BucketManager:
     """
     Manager to handle S3 bucket connections and file operations.
     """
+
     def __init__(self, aws_conn_id='minio_localhost', bucket_name=None):
         """
         Args:
@@ -234,3 +238,56 @@ def remove_blob_columns(input_file, output_file):
                     file.write(line)
             except UnicodeDecodeError:
                 continue
+
+
+def run_query_in_pod(
+        query: str,
+        conn_id: str,
+        pod_name: str,
+        namespace: str,
+        kube_config_path: str,
+):
+    """
+    Executes a PostgreSQL query inside a specified Kubernetes pod.
+
+    This function connects to a Kubernetes pod and runs a PostgreSQL query using
+    credentials obtained from the specified Airflow connection.
+
+    Args:
+        query (str): The SQL query to execute in the pod.
+        conn_id (str): The Airflow connection ID for the PostgreSQL database.
+        pod_name (str): The name of the Kubernetes pod where the query should be executed.
+        namespace (str): The Kubernetes namespace in which the pod is located.
+        kube_config_path (str): Path to the Kubernetes configuration file used to authenticate and connect.
+
+    Returns:
+        str: Output from the command executed inside the pod, including query results or any error messages.
+    """
+    from kubernetes import client, config, stream
+
+    config.load_kube_config(config_file=kube_config_path)
+    v1 = client.CoreV1Api()
+
+    db_hook = PostgresHook(postgres_conn_id=conn_id)
+    conn = db_hook.get_connection(conn_id=conn_id)
+
+    exec_command = [
+        "sh", "-c",
+        f"PGPASSWORD='{conn.password}' psql -h {conn.host} -p {conn.port} -U {conn.login} -d {conn.schema} -c \"{query}\""
+    ]
+
+    response = stream.stream(
+        v1.connect_get_namespaced_pod_exec,
+        pod_name,
+        namespace,
+        command=exec_command,
+        stderr=True,
+        stdin=False,
+        stdout=True,
+        tty=False,
+    )
+    return f"Command output: {response}"
+
+# for kati in katiallo():
+#     if kati.startwith("staging-worker"):
+#         pod_neme = kati

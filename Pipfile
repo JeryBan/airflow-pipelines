@@ -16,6 +16,7 @@ openpyxl = "*"
 apache-airflow-providers-ssh = "*"
 apache-airflow-providers-sftp = "*"
 apache-airflow-providers-cncf-kubernetes = "*"
+flask = "*"
 
 [dev-packages]
 apache-airflow = "*"
