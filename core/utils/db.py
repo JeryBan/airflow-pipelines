@@ -15,6 +15,7 @@ from core.share import DIRECTORIES
 
 CONF_DIR = DIRECTORIES.CONFIG
 
+
 class EaeConnectionManager:
     """
     Connection manager for Eae databases.
@@ -287,7 +288,3 @@ def run_query_in_pod(
         tty=False,
     )
     return f"Command output: {response}"
-
-# for kati in katiallo():
-#     if kati.startwith("staging-worker"):
-#         pod_neme = kati

@@ -10,14 +10,6 @@ DATA_DIR = DIRECTORIES.DATA
 TEMP_DIR = DIRECTORIES.TEMP
 
 
-def query_to_csv(query,
-                 save_path) -> None:
-    """Saves to a csv file the result of a query."""
-    with open(save_path, "w") as f:
-        csv_writer = csv.writer(delimiter='|', csvfile=f)
-        csv_writer.writerow(row for row in query)
-
-
 def export_xls_from_base64(data, filename=None):
     """
     Creates xls from data encoded in base64.

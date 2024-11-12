@@ -25,6 +25,9 @@ class DIRECTORIES:
             Path(d).mkdir(parents=True, exist_ok=True)
 
 
+DIRECTORIES.create_directories()
+
+
 class URLS:
     """
     Shared URLs for all dags to use.
@@ -32,4 +35,4 @@ class URLS:
     DOWNLOAD = 'http://localhost:8080/download'
 
 
-DIRECTORIES.create_directories()
+

@@ -14,7 +14,7 @@ download_bp = Blueprint("download_bp", __name__, url_prefix="/download")
 @download_bp.route("/<filename>", methods=["GET"])
 def download_file(filename):
     """
-    Serve a file download using Werkzeug
+    Serve a file download using Flask
     """
     file_path = safe_join(DATA_DIR, filename)
     if os.path.exists(file_path):
