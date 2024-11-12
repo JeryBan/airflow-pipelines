@@ -26,13 +26,11 @@ pipenv install
 inside a `pipenv environmnet`.
 ## Variables
 
-* airflow requires to keep a `.env` file in the root project directory with the `AIRFLOW_UID` variable inside.
-
-In the production environment set `AIRFLOW_UID=0`. To run locally run first:
+* For password encryption airflow uses fernet key. Run:
 ```bash
-id -u
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
-and set `AIRFLOW_UID` to that number.
+and set `[core] -> fernet_key` or `AIRFLOW__CORE__FERNET_KEY` variable.
 
 
 ## Structure
