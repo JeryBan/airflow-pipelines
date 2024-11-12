@@ -3,6 +3,7 @@ FROM apache/airflow:2.9.1
 ENV PROJECT_ROOT="/opt/airflow"
 
 COPY requirements.txt /
+COPY .env $PROJECT_ROOT
 COPY ./config/wheels/* $PROJECT_ROOT/config/wheels/
 
 RUN pip install --upgrade pip && \

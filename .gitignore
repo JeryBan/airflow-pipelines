@@ -88,4 +88,3 @@ logs/*
 dags/data/
 dags/dumps/
 dags/tmp/
-config/custom_airflow.cfg
