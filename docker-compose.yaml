@@ -94,7 +94,11 @@ services:
 
   airflow-webserver:
     !!merge <<: *airflow-common
-    command: webserver
+    command: >
+      bash -c "
+        activate-global-python-argcomplete && 
+        airflow webserver
+      "
     ports:
     - "8080:8080"
     healthcheck:
