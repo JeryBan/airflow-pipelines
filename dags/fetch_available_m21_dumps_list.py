@@ -5,6 +5,7 @@ from airflow.providers.sftp.hooks.sftp import SFTPHook
 from airflow.providers.ssh.operators.ssh import SSHOperator
 
 from core.share import DIRECTORIES
+from core.utils.vpn import VPNHook
 
 TEMP_DIR = DIRECTORIES.TEMP
 
@@ -26,7 +27,13 @@ def fetch_available_m21_dumps_list():
     **Requires:**
 
         * conn_id: m21_webserver
+        * conn_id: synelixis_vpn
     """
+    @task
+    def open_vpn():
+        vpn_hook = VPNHook(conn_id='synelixis_vpn')
+        vpn_hook.start_vpn()
+        return 'Vpn opened'
 
     command = """
     ssh database_server 'ls /database/exports/ypaat-backup-* >> dumps.txt && exit'
@@ -57,7 +64,7 @@ def fetch_available_m21_dumps_list():
         command='rm /tmp/dumps.txt',
     )
 
-    ssh >> get_filenames() >> cleanup
+    open_vpn() >> ssh >> get_filenames() >> cleanup
 
 
 fetch_available_m21_dumps = fetch_available_m21_dumps_list()
