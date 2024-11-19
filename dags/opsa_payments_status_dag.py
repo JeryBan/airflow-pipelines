@@ -30,7 +30,7 @@ headers = {
 
 @dag(
     dag_id='opsa_payments_status_dag',
-    tags=['m2_1'],
+    tags=['m21'],
     default_args=default_args,
     schedule_interval=None,
     catchup=False

@@ -3,6 +3,7 @@ from datetime import timedelta
 from airflow.decorators import dag, task
 from airflow.providers.sftp.hooks.sftp import SFTPHook
 from airflow.providers.ssh.operators.ssh import SSHOperator
+from airflow.utils.trigger_rule import TriggerRule
 
 from core.share import DIRECTORIES
 from core.utils.vpn import VPNHook
@@ -29,6 +30,7 @@ def fetch_available_m21_dumps_list():
         * conn_id: m21_webserver
         * conn_id: synelixis_vpn
     """
+
     @task
     def open_vpn():
         vpn_hook = VPNHook(conn_id='synelixis_vpn')
@@ -64,7 +66,14 @@ def fetch_available_m21_dumps_list():
         command='rm /tmp/dumps.txt',
     )
 
-    open_vpn() >> ssh >> get_filenames() >> cleanup
+    @task(trigger_rule=TriggerRule.ALL_DONE)
+    def close_vpn():
+        vpn_hook = VPNHook(conn_id='synelixis_vpn')
+        vpn_hook.stop_vpn()
+        return 'Vpn closed'
+
+    open_vpn() >> ssh >> get_filenames() >> \
+    cleanup >> close_vpn()
 
 
 fetch_available_m21_dumps = fetch_available_m21_dumps_list()

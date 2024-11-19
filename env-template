@@ -1,5 +1,6 @@
 # id -u
 AIRFLOW_UID=
+#
 # python -c "from airflow.configuration import conf; print(conf.airflow_home, conf.airflow_config)"
 AIRFLOW__CORE__FERNET_KEY=
 
@@ -8,4 +9,5 @@ AIRFLOW__CORE__FERNET_KEY=
 # leave port empty in production for security
 AIRFLOW_DB_PORT=
 #
+# default: airflow
 AIRFLOW_DB_PASSWORD=

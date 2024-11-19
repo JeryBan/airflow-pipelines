@@ -9,7 +9,7 @@ from core.share import DIRECTORIES
 DUMP_DIR = DIRECTORIES.DUMPS
 
 default_args = {
-    'owner': 'Cognitera',
+    'owner': 'Airflow',
     'retries': 1,
     'retry_delay': timedelta(seconds=10)
 }
