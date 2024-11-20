@@ -26,6 +26,16 @@ pipenv install
 inside a `pipenv environmnet`.
 ## Variables
 
+* Use the `env-template` to create a `.env` file.
+
+
+* To set the airflow user run:
+```bash
+id -u
+```
+and set that number to `AIRFLOW_UID` variable.
+
+
 * For password encryption airflow uses fernet key. Run:
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

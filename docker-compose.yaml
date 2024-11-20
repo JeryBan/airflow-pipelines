@@ -57,16 +57,9 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
-    # yamllint disable rule:line-length
-    # Use simple http server on scheduler for health checks
-    # See https://airflow.apache.org/docs/apache-airflow/stable/administration-and-deployment/logging-monitoring/check-health.html#scheduler-health-check-server
-    # yamllint enable rule:line-length
-    AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     # WARNING: Use _PIP_ADDITIONAL_REQUIREMENTS option ONLY for a quick checks
     # for other purpose (development, test and especially production usage) build/extend Airflow image.
     _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
-    # The following line can be used to set a custom config file, stored in the local config folder
-    # If you want to use it, outcomment it and replace custom_airflow.cfg with the name of your config file
     AIRFLOW_CONFIG: '/opt/airflow/config/custom_airflow.cfg'
     PYTHONPATH: "/opt/airflow/"
   volumes:
@@ -101,7 +94,11 @@ services:
 
   airflow-webserver:
     !!merge <<: *airflow-common
-    command: webserver
+    command: >
+      bash -c "
+        activate-global-python-argcomplete && 
+        airflow webserver
+      "
     ports:
     - "8080:8080"
     healthcheck:

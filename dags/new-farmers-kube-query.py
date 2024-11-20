@@ -80,7 +80,7 @@ def kube_query_dag():
             filename = os.path.basename(save_path)
             download_path = f'{DOWNLOAD_URL}/{filename}'
 
-            print(f"http://localhost:8080/download/{filename}")
+            print(download_path)
             return download_path
 
     run_query_task >> query_to_csv()
