@@ -244,9 +244,10 @@ def remove_blob_columns(input_file, output_file):
 def run_query_in_pod(
         query: str,
         conn_id: str,
-        pod_name: str,
         namespace: str,
+        worker_pod_name: str,
         kube_config_path: str,
+        context: str = None
 ):
     """
     Executes a PostgreSQL query inside a specified Kubernetes pod.
@@ -257,7 +258,9 @@ def run_query_in_pod(
     Args:
         query (str): The SQL query to execute in the pod.
         conn_id (str): The Airflow connection ID for the PostgreSQL database.
-        pod_name (str): The name of the Kubernetes pod where the query should be executed.
+        context (str): context: set the active context. If is set to None, current_context
+        from config file will be used.
+        worker_pod_name (str): The name of the Kubernetes pod where the query should be executed.
         namespace (str): The Kubernetes namespace in which the pod is located.
         kube_config_path (str): Path to the Kubernetes configuration file used to authenticate and connect.
 
@@ -266,7 +269,7 @@ def run_query_in_pod(
     """
     from kubernetes import client, config, stream
 
-    config.load_kube_config(config_file=kube_config_path)
+    config.load_kube_config(config_file=kube_config_path, context=context)
     v1 = client.CoreV1Api()
 
     db_hook = PostgresHook(postgres_conn_id=conn_id)
@@ -279,8 +282,8 @@ def run_query_in_pod(
 
     response = stream.stream(
         v1.connect_get_namespaced_pod_exec,
-        pod_name,
-        namespace,
+        worker_pod_name,
+        namespace=namespace,
         command=exec_command,
         stderr=True,
         stdin=False,

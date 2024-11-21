@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Config
 preferences: {}
-current-context: new-farmers-AKS
+current-context: cognitor-aks
 contexts:
 - context:
     cluster: new-farmers-AKS
@@ -11,6 +11,7 @@ contexts:
 - context:
     cluster: cognitor-aks
     user: clusterUser_cognitor_cognitor-aks
+    namespace: cognitera-platform
   name: cognitor-aks
 - context:
     cluster: synelixis
