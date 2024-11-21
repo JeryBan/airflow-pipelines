@@ -14,29 +14,31 @@ CONF_DIR = DIRECTORIES.CONFIG
 DOWNLOAD_URL = URLS.DOWNLOAD
 
 
-POD_NAME = Variable.get("new-farmers-staging-worker-pod-name")
-NAMESPACE = 'staging'
-CONN_ID = 'new-farmers-staging-db'
+CONTEXT = 'cognitor-aks'
+NAMESPACE = 'cognitera-platform'
+CONN_ID = 'cognitera-database-postgresql-primary'
 KUBE_CONF_PATH = f'{CONF_DIR}/kube/config'
 
 
 default_args = {
     'owner': 'Cognitera',
     'retries': 2,
-    'retry_delay': timedelta(seconds=60)
+    'retry_delay': timedelta(seconds=60),
+    'default_view': 'graph'
 }
 
 
 @dag(
-    dag_id='new-farmers-kube-query.py',
-    tags=['new-farmers'],
+    dag_id='kube-query.py',
+    tags=['cognitera'],
     default_args=default_args,
     schedule_interval=None,
     catchup=False,
     params={
         'query': None,
+        'context': CONTEXT,
         'namespace': NAMESPACE,
-        'pod_name': POD_NAME,
+        'worker_pod_name': None,
         'conn_id': CONN_ID,
         'kube_conf_path': KUBE_CONF_PATH
     }
@@ -47,8 +49,9 @@ def kube_query_dag():
         python_callable=run_query_in_pod,
         op_kwargs={
             "query": "{{ params.query }}",
+            "context": "{{ params.context }}",
             "namespace": "{{ params.namespace }}",
-            "pod_name": "{{ params.pod_name }}",
+            "worker_pod_name": "{{ params.worker_pod_name }}",
             "conn_id": "{{ params.conn_id }}",
             "kube_config_path": "{{ params.kube_conf_path }}"
         },
