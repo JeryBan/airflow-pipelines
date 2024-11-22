@@ -7,8 +7,16 @@ name = "pypi"
 python-dotenv = "*"
 apache-airflow = "*"
 apache-airflow-providers-postgres = "*"
+eae-api-client = { file = "./config/wheels/eae_api_client-0.2.0-py2.py3-none-any.whl" }
 torch = "*"
 torchvision = "*"
+pandas = "*"
+xlrd = "*"
+openpyxl = "*"
+apache-airflow-providers-ssh = "*"
+apache-airflow-providers-sftp = "*"
+apache-airflow-providers-cncf-kubernetes = "*"
+flask = "*"
 
 [dev-packages]
 apache-airflow = "*"

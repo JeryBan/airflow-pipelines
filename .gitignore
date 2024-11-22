@@ -83,5 +83,9 @@ ipython_config.py
 
 # airflow
 secrets.py
+.env
 logs/*
-dags/data/ 
+dags/data/
+dags/dumps/
+dags/tmp/
+config/vpns/

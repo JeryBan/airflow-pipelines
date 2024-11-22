@@ -1,0 +1,18 @@
+# id -u
+AIRFLOW_UID=
+#
+# python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+AIRFLOW__CORE__FERNET_KEY=
+
+# ---------- Airflow DB --------------
+#
+# leave empty in production, defaults to loopback ip
+POSTGRES_PORT=
+#
+# default: airflow
+AIRFLOW_DB_PASSWORD=
+
+# -------- Airflow UI -------------
+#
+# password for the ui airflow user
+_AIRFLOW_WWW_USER_PASSWORD=
